@@ -2,6 +2,8 @@ namespace SiemensInterviewTest.Services;
 
 public class InvoiceService
 {
+    // BUG: discount logic is wrong — stacks incorrectly
+    // Missing: null check, XML docs, unit tests
     public decimal CalculateTotal(List<LineItem> items)
     {
         decimal total = 0;
