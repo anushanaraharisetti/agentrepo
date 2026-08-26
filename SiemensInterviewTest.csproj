@@ -5,6 +5,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AssemblyName>PRReviewAgent</AssemblyName>
+    <RootNamespace>PRReviewAgent</RootNamespace>
   </PropertyGroup>
 
   <!-- Exclude the Tests subfolder from the main project build -->

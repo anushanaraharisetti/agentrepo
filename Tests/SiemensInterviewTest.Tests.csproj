@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <AssemblyName>PRReviewAgent.Tests</AssemblyName>
+    <RootNamespace>PRReviewAgent.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

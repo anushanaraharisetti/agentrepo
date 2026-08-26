@@ -11,9 +11,9 @@
 //  ✅ Null input
 // ============================================================
 
-using SiemensInterviewTest.Services;
+using PRReviewAgent.Services;
 
-namespace SiemensInterviewTest.Tests;
+namespace PRReviewAgent.Tests;
 
 public class InvoiceServiceTests
 {

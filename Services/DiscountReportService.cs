@@ -1,4 +1,4 @@
-namespace SiemensInterviewTest.Services;
+namespace PRReviewAgent.Services;
 
 /// <summary>
 /// Generates human-readable discount reports for invoice totals.

@@ -1,4 +1,4 @@
-namespace SiemensInterviewTest.Services;
+namespace PRReviewAgent.Services;
 
 /// <summary>
 /// Provides invoice calculation services including tiered discount logic.
