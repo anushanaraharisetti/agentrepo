@@ -9,11 +9,14 @@
     <RootNamespace>PRReviewAgent</RootNamespace>
   </PropertyGroup>
 
-  <!-- Exclude the Tests subfolder from the main project build -->
+  <!-- Exclude the Tests and SiemensInterviewTest subfolders from the main project build -->
   <ItemGroup>
     <Compile Remove="Tests/**" />
     <None Remove="Tests/**" />
     <EmbeddedResource Remove="Tests/**" />
+    <Compile Remove="SiemensInterviewTest/**" />
+    <None Remove="SiemensInterviewTest/**" />
+    <EmbeddedResource Remove="SiemensInterviewTest/**" />
   </ItemGroup>
 
   <ItemGroup>
