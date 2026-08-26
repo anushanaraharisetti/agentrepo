@@ -1,4 +1,4 @@
-﻿namespace SiemensInterviewTest.Tests;
+﻿namespace PRReviewAgent.Tests;
 
 public class UnitTest1
 {
