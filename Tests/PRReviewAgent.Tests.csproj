@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SiemensInterviewTest.csproj" />
+    <ProjectReference Include="..\PRReviewAgent.csproj" />
   </ItemGroup>
 
 </Project>

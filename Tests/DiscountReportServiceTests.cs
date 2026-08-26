@@ -1,6 +1,6 @@
-using SiemensInterviewTest.Services;
+using PRReviewAgent.Services;
 
-namespace SiemensInterviewTest.Tests;
+namespace PRReviewAgent.Tests;
 
 public class DiscountReportServiceTests
 {
