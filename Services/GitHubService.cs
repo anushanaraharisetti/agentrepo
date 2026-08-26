@@ -146,10 +146,33 @@ public class GitHubService
             Event    = reviewType
         };
 
-        await _client!.PullRequest.Review.Create(owner, repo, prNumber, review);
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"  ✅ GitHub review submitted: {reviewType}");
-        Console.ResetColor();
+        try
+        {
+            await _client!.PullRequest.Review.Create(owner, repo, prNumber, review);
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"  ✅ GitHub review submitted: {reviewType}");
+            Console.ResetColor();
+        }
+        catch (Octokit.ApiValidationException ex)
+            when (ex.Message.Contains("approve your own pull request"))
+        {
+            // GitHub does not allow a PR author to approve their own PR.
+            // Fall back to a plain comment review so the run still completes.
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("  ⚠️  Cannot approve own PR — falling back to Comment review.");
+            Console.ResetColor();
+
+            var commentReview = new PullRequestReviewCreate
+            {
+                CommitId = commitSha,
+                Body     = body,
+                Event    = PullRequestReviewEvent.Comment
+            };
+            await _client!.PullRequest.Review.Create(owner, repo, prNumber, commentReview);
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("  ✅ Comment review posted (self-review fallback).");
+            Console.ResetColor();
+        }
     }
 
     // ── Merge PR ─────────────────────────────────────────────
@@ -178,18 +201,28 @@ public class GitHubService
             MergeMethod   = PullRequestMergeMethod.Squash
         };
 
-        var mergeResult = await _client!.PullRequest.Merge(owner, repo, prNumber, merge);
+        try
+        {
+            var mergeResult = await _client!.PullRequest.Merge(owner, repo, prNumber, merge);
 
-        if (mergeResult.Merged)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"  ✅ PR #{prNumber} merged successfully.");
-            Console.ResetColor();
+            if (mergeResult.Merged)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"  ✅ PR #{prNumber} merged successfully.");
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  ❌ Merge failed: {mergeResult.Message}");
+                Console.ResetColor();
+            }
         }
-        else
+        catch (Octokit.PullRequestNotMergeableException)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  ❌ Merge failed: {mergeResult.Message}");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  ⚠️  PR #{prNumber} has merge conflicts — resolve them before merging.");
+            Console.WriteLine("      Run: git fetch origin && git merge origin/main, fix conflicts, then push.");
             Console.ResetColor();
         }
     }
