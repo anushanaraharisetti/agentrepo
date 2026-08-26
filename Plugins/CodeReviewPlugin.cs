@@ -40,29 +40,51 @@ public class CodeReviewPlugin
     {
         Console.WriteLine("  🔧 [Tool Called] CheckCodeQuality");
 
+        // Only analyse lines being ADDED (starting with +)
+        // Ignore removed lines (-) and context lines — they are not the new code
+        var addedLines = diff.Split('\n')
+            .Where(l => l.StartsWith("+") && !l.StartsWith("+++"))
+            .Select(l => l[1..]) // strip the leading +
+            .ToList();
+
+        string addedCode = string.Join("\n", addedLines);
+        int addedCount   = addedLines.Count;
+
         var issues = new List<string>();
-        var lines  = diff.Split('\n');
-        int addedLines = lines.Count(l => l.StartsWith("+") && !l.StartsWith("+++"));
 
-        if (addedLines > 20)
-            issues.Add($"Method body is large ({addedLines} added lines) — consider splitting");
+        if (addedCount > 30)
+            issues.Add($"Large addition ({addedCount} lines) — consider splitting into smaller methods");
 
-        if (Regex.IsMatch(diff, @"\b(10000|20000|0\.1m|0\.05m)\b"))
+        // Magic numbers — only flag if no named constants are defined
+        bool hasMagicNumbers = Regex.IsMatch(addedCode, @"\b(10000|20000|10_000|20_000)\b");
+        bool hasConstants     = addedCode.Contains("const ") || addedCode.Contains("private const");
+        if (hasMagicNumbers && !hasConstants)
             issues.Add("Magic numbers detected — extract to named constants");
 
-        if (diff.Contains("List<") && !diff.Contains("null") && !diff.Contains("ArgumentNull"))
-            issues.Add("No null guard on input parameter — add ArgumentNullException check");
+        // Null guard — only flag if there's a List parameter and no null check
+        bool hasListParam  = addedCode.Contains("List<");
+        bool hasNullCheck  = addedCode.Contains("ArgumentNullException") ||
+                             addedCode.Contains("ThrowIfNull") ||
+                             addedCode.Contains("?? throw") ||
+                             addedCode.Contains("is null");
+        if (hasListParam && !hasNullCheck)
+            issues.Add("No null guard on List parameter — add ArgumentNullException check");
 
-        int ifCount = Regex.Matches(diff, @"if\s*\(total\s*>").Count;
-        if (ifCount > 1)
-            issues.Add($"Discount logic has {ifCount} stacked if-blocks — discounts compound unexpectedly (likely a bug)");
+        // Stacked if-blocks for discount (the original bug)
+        int ifDiscountCount = Regex.Matches(addedCode, @"if\s*\(total\s*>").Count;
+        bool hasSwitchExpr  = addedCode.Contains("switch");
+        if (ifDiscountCount > 1 && !hasSwitchExpr)
+            issues.Add($"Stacked if-blocks for discount logic ({ifDiscountCount}) — use switch expression or else-if");
 
-        if (diff.Contains("for (int i = 0") || diff.Contains("for(int i = 0"))
+        // For-loop when LINQ available
+        bool hasForLoop = addedCode.Contains("for (int i") || addedCode.Contains("for(int i");
+        bool hasLinq    = addedCode.Contains(".Sum(") || addedCode.Contains(".Select(") || addedCode.Contains(".Where(");
+        if (hasForLoop && !hasLinq)
             issues.Add("Manual for-loop — prefer LINQ: items.Sum(x => x.Quantity * x.UnitPrice)");
 
         var result = issues.Count > 0
             ? $"CODE QUALITY — {issues.Count} issue(s):\n" + string.Join("\n", issues.Select(i => $"  • {i}"))
-            : "CODE QUALITY — ✅ No issues found.";
+            : $"CODE QUALITY — ✅ No issues found in {addedCount} added lines.";
 
         _findings.Add(result);
         return result;
@@ -76,14 +98,29 @@ public class CodeReviewPlugin
     {
         Console.WriteLine("  🔧 [Tool Called] CheckTestCoverage");
 
-        bool hasTests = diff.Contains("[Test]")   || diff.Contains("[Fact]")
-                     || diff.Contains("[Theory]") || diff.Contains("void Should")
-                     || diff.Contains("Assert.")  || diff.Contains("Test.cs");
+        // Only look at added lines
+        string addedCode = string.Join("\n", diff.Split('\n')
+            .Where(l => l.StartsWith("+") && !l.StartsWith("+++"))
+            .Select(l => l[1..]));
 
-        var result = (!hasTests || diff.Contains("No unit tests"))
-            ? "TEST COVERAGE — ❌ No tests added. Required: happy path, empty list, " +
-              "negative values, discount threshold boundaries (exactly 10000, 20000)."
-            : "TEST COVERAGE — ✅ Tests detected.";
+        bool hasTests = addedCode.Contains("[Fact]")
+                     || addedCode.Contains("[Test]")
+                     || addedCode.Contains("[Theory]")
+                     || addedCode.Contains("Assert.")
+                     || addedCode.Contains("void Should")
+                     || diff.Contains("Tests.csproj")   // test project added
+                     || diff.Contains("Test.cs")
+                     || diff.Contains("Tests.cs");
+
+        // Also check if a test file path appears in the diff header
+        bool testFileInDiff = diff.Split('\n')
+            .Any(l => (l.StartsWith("+++") || l.StartsWith("File:"))
+                   && (l.Contains("Test") || l.Contains("test") || l.Contains("Spec")));
+
+        var result = (hasTests || testFileInDiff)
+            ? "TEST COVERAGE — ✅ Tests detected in this PR."
+            : "TEST COVERAGE — ❌ No tests added. Required: happy path, empty list, " +
+              "negative values, discount threshold boundaries.";
 
         _findings.Add(result);
         return result;
@@ -125,13 +162,19 @@ public class CodeReviewPlugin
     {
         Console.WriteLine("  🔧 [Tool Called] CheckConventions");
 
+        string addedCode = string.Join("\n", diff.Split('\n')
+            .Where(l => l.StartsWith("+") && !l.StartsWith("+++"))
+            .Select(l => l[1..]));
+
         var issues = new List<string>();
 
-        if (diff.Contains("public ") && !diff.Contains("/// <summary>"))
-            issues.Add("Missing XML documentation on public method");
+        bool hasPublicMethod = addedCode.Contains("public ") &&
+                               (addedCode.Contains("(") && addedCode.Contains(")"));
+        bool hasXmlDocs      = addedCode.Contains("/// <summary>") ||
+                               addedCode.Contains("///<summary>");
 
-        if (diff.Contains("No XML documentation"))
-            issues.Add("PR description explicitly states XML docs are missing");
+        if (hasPublicMethod && !hasXmlDocs)
+            issues.Add("Missing XML documentation on public members");
 
         var result = issues.Count > 0
             ? $"CONVENTIONS — {issues.Count} issue(s):\n" + string.Join("\n", issues.Select(i => $"  • {i}"))

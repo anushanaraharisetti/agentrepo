@@ -64,7 +64,7 @@ var reviewPlugin = new CodeReviewPlugin(interactiveMode: true);
 var githubSvc    = new GitHubService(githubToken);
 
 var kernel = Kernel.CreateBuilder()
-    .AddOpenAIChatCompletion(modelId: "gpt-4o", apiKey: apiKey, httpClient: httpClient)
+    .AddOpenAIChatCompletion(modelId: "gpt-4o-mini", apiKey: apiKey, httpClient: httpClient)
     .Build();
 
 kernel.Plugins.AddFromObject(reviewPlugin, "CodeReview");
@@ -78,7 +78,7 @@ Console.WriteLine();
 Console.WriteLine($"  Repo     : {githubOwner}/{githubRepo}");
 Console.WriteLine($"  PR       : #{prNumber}");
 Console.WriteLine($"  GitHub   : {(githubToken is null ? "Mock mode" : "Live mode ✅")}");
-Console.WriteLine($"  OpenAI   : gpt-4o");
+Console.WriteLine($"  OpenAI   : gpt-4o-mini (rate-limit safe)");
 Console.WriteLine();
 
 // ── 4. Fetch the PR from GitHub (or mock) ────────────────────
@@ -142,8 +142,28 @@ while (true)
     Console.WriteLine($"\n  [Round {round}] Agent reasoning...");
     Console.ResetColor();
 
-    var response = await chatService.GetChatMessageContentAsync(
-        history, executionSettings: settings, kernel: kernel);
+    // Retry loop with exponential backoff for rate limit errors
+    Microsoft.SemanticKernel.ChatMessageContent response = null!;
+    int retryDelayMs = 10_000;
+    for (int attempt = 1; attempt <= 5; attempt++)
+    {
+        try
+        {
+            response = await chatService.GetChatMessageContentAsync(
+                history, executionSettings: settings, kernel: kernel);
+            break; // success
+        }
+        catch (Microsoft.SemanticKernel.HttpOperationException ex)
+            when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            if (attempt == 5) throw;
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"  ⏳ Rate limit hit — waiting {retryDelayMs / 1000}s before retry ({attempt}/5)...");
+            Console.ResetColor();
+            await Task.Delay(retryDelayMs);
+            retryDelayMs *= 2; // exponential backoff
+        }
+    }
 
     history.AddAssistantMessage(response.Content ?? string.Empty);
 
@@ -206,7 +226,7 @@ Console.WriteLine();
 Console.WriteLine("── Step 4: Post to GitHub ───────────────────────────");
 Console.WriteLine();
 await githubSvc.PostReviewCommentAsync(githubOwner, githubRepo, prNumber, result);
-await githubSvc.SubmitReviewAsync(githubOwner, githubRepo, prNumber, result, commitSha: "HEAD");
+await githubSvc.SubmitReviewAsync(githubOwner, githubRepo, prNumber, result, commitSha: pr.CommitSha);
 
 // ── 10. Human-in-the-Loop gate ───────────────────────────────
 Console.WriteLine();

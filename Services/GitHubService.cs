@@ -72,7 +72,8 @@ public class GitHubService
             Author      : pr.User.Login,
             SourceBranch: pr.Head.Ref,
             TargetBranch: pr.Base.Ref,
-            Diff        : diffText
+            Diff        : diffText,
+            CommitSha   : pr.Head.Sha   // real commit SHA for review submission
         );
     }
 
@@ -245,8 +246,9 @@ public class GitHubService
             Number      : prNumber,
             Title       : "Add invoice total calculation",
             Author      : "john.doe",
-            SourceBranch: "feature/invoice-total",
+            SourceBranch: "feature/invoice-service",
             TargetBranch: "main",
+            CommitSha   : "417d776b1ee8d50cd8b56c5c7d5a2f21a4e5b215",
             Diff        : """
                 PR Title:  Add invoice total calculation
                 PR Author: john.doe
@@ -288,5 +290,6 @@ public record PullRequestContext(
     string Author,
     string SourceBranch,
     string TargetBranch,
-    string Diff
+    string Diff,
+    string CommitSha  // actual HEAD SHA — needed for submitting reviews
 );
